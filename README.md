@@ -8,6 +8,9 @@ A compact data format optimized for transmitting structured information to Large
 [![PyPI](https://img.shields.io/pypi/v/python-toon.svg)](https://pypi.org/project/python-toon/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/python-toon.svg)](https://pypi.org/project/python-toon/)
 
+[![Downloads](https://static.pepy.tech/badge/python-toon)](https://pepy.tech/project/python-toon)
+[![Downloads per month](https://static.pepy.tech/badge/python-toon/month)](https://pepy.tech/project/python-toon)
+
 ## Installation
 
 ```bash
