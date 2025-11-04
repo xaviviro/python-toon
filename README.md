@@ -1,5 +1,7 @@
 # python-toon encoder/decoder
 
+> **⚠️ DEPRECATED**: This repository is deprecated. Please use the official implementation at **[toon-format/toon-python](https://github.com/toon-format/toon-python)**.
+
 **Token-Oriented Object Notation for Python**
 
 A compact data format optimized for transmitting structured information to Large Language Models (LLMs) with 30-60% fewer tokens than JSON.
