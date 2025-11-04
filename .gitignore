@@ -31,16 +31,6 @@ MANIFEST
 python_toon.egg-info/
 toon.egg-info/
 
-# Claude-related files (DO NOT COMMIT)
-CLAUDE.md
-.claude/
-*.claude
-.claude_code/
-.claudecode/
-
-# Configuration files with sensitive information (DO NOT COMMIT)
-CONF.md
-
 # Ruff cache
 .ruff_cache/
 
@@ -82,6 +72,8 @@ venv.bak/
 *.swp
 *.swo
 *~
+.claude/
+CLAUDE.md
 
 # macOS
 .DS_Store
@@ -105,6 +97,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-./toon_specs
-/toon_specs
-toon_specs/
+# uv
+.uv/
+uv.lock
+
+PR_DESCRIPTION.md

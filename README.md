@@ -4,7 +4,7 @@
 
 A compact data format optimized for transmitting structured information to Large Language Models (LLMs) with 30-60% fewer tokens than JSON.
 
-[![Tests](https://github.com/xaviviro/python-toon/actions/workflows/test.yml/badge.svg)](https://github.com/xaviviro/python-toon/actions)
+[![Tests](https://github.com/toon-format/toon-python/actions/workflows/test.yml/badge.svg)](https://github.com/toon-format/toon-python/actions)
 [![PyPI](https://img.shields.io/pypi/v/python-toon.svg)](https://pypi.org/project/python-toon/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/python-toon.svg)](https://pypi.org/project/python-toon/)
 
@@ -18,7 +18,7 @@ pip install python-toon
 
 TOON (Token-Oriented Object Notation) combines YAML's indentation-based structure for nested objects and CSV's tabular format for uniform data rows, optimized specifically for token efficiency in LLM contexts.
 
-This is a faithful Python port of the original [TOON TypeScript library](https://github.com/johannschopplich/toon) by Johann Schopplich, maintaining 100% output compatibility with the [official TOON specification](https://github.com/johannschopplich/toon/blob/main/SPEC.md).
+This is a faithful Python implementation maintaining 100% output compatibility with the [official TOON specification](https://github.com/toon-format/spec).
 
 ### Key Features
 
@@ -313,7 +313,7 @@ The length bracket format depends on the array type:
 
 ### Quoting Rules
 
-Strings are quoted only when necessary (following the [TOON specification](https://github.com/johannschopplich/toon/blob/main/SPEC.md)):
+Strings are quoted only when necessary (following the [TOON specification](https://github.com/toon-format/spec)):
 
 - Empty strings
 - Keywords: `null`, `true`, `false`
@@ -407,12 +407,32 @@ users[3,]{id,name,age,active}:
 
 ## Development
 
-### Setup
+This project uses [uv](https://docs.astral.sh/uv/) for fast, reliable package and environment management.
+
+### Setup with uv (Recommended)
+
+```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone the repository
+git clone https://github.com/toon-format/toon-python.git
+cd toon-python
+
+# Create virtual environment and install dependencies
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install package in editable mode with dev dependencies
+uv pip install -e ".[dev]"
+```
+
+### Setup with pip (Alternative)
 
 ```bash
 # Clone the repository
-git clone https://github.com/xaviviro/python-toon.git
-cd python-toon
+git clone https://github.com/toon-format/toon-python.git
+cd toon-python
 
 # Create virtual environment
 python -m venv venv
@@ -432,31 +452,24 @@ pip install -r requirements-dev.txt
 pytest
 
 # Run with coverage
-pytest --cov=pytoon --cov-report=term
-
-# Run original compatibility tests
-python test_original_cases.py
+pytest --cov=toon --cov-report=term
 ```
 
 ### Type Checking
 
 ```bash
-mypy src/pytoon
+mypy src/toon
 ```
 
 ### Linting
 
 ```bash
-ruff check src/pytoon tests
+ruff check src/toon tests
 ```
 
 ## Credits
 
-This project is a Python implementation of the original [TOON](https://github.com/johannschopplich/toon) format created by [Johann Schopplich](https://github.com/johannschopplich).
-
-**Original TOON (TypeScript)**: MIT License © 2025-PRESENT Johann Schopplich
-
-**python-toon (Python port)**: Developed by Xavi Vinaixa
+This project is a Python implementation of the TOON format.
 
 ## License
 
@@ -464,18 +477,17 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Related
 
-- [Original TOON (TypeScript)](https://github.com/johannschopplich/toon) - The original implementation
-- [TOON Format Specification (SPEC.md)](https://github.com/johannschopplich/toon/blob/main/SPEC.md) - Official v1 specification with normative encoding rules
-- [TOON README](https://github.com/johannschopplich/toon#readme) - Format overview and examples
+- [TOON Format Specification](https://github.com/toon-format/spec) - Official specification with normative encoding rules
+- [TOON Format Organization](https://github.com/toon-format) - Official TOON format organization
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 When contributing, please:
-- Run `python test_original_cases.py` to ensure 100% compatibility with the original
 - Add tests for new features
 - Update documentation as needed
+- Ensure compatibility with the TOON specification
 
 ## Support
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "python-toon"
-version = "0.1.2"
+version = "0.1.3"
 description = "TOON (Token-Oriented Object Notation) encoder/decoder for Python - Bidirectional JSON-to-TOON converter optimized for LLMs"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -29,8 +29,17 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/xaviviro/python-toon"
-Repository = "https://github.com/xaviviro/python-toon.git"
-Issues = "https://github.com/xaviviro/python-toon/issues"
+Repository = "https://github.com/xaviviro/python-toon"
+Documentation = "https://github.com/toon-format/spec"
+"Bug Tracker" = "https://github.com/xaviviro/python-toon/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.8.0",
+    "mypy>=1.8.0",
+]
 
 [project.scripts]
 toon = "toon.cli:main"
