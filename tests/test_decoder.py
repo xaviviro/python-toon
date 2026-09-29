@@ -163,27 +163,16 @@ class TestDelimiters:
         }
 
 
-class TestLengthMarker:
-    """Test length marker support."""
+class TestLegacyLengthMarker:
+    """The '#' length marker was removed from the TOON spec."""
 
-    def test_decode_with_length_marker(self):
-        """Test decoding with # length marker."""
-        toon = "tags[#3]: a,b,c"
-        result = decode(toon)
-        assert result == {"tags": ["a", "b", "c"]}
+    def test_length_marker_is_rejected(self):
+        with pytest.raises(ToonDecodeError, match="malformed bracket"):
+            decode("tags[#3]: a,b,c")
 
-    def test_decode_tabular_with_length_marker(self):
-        """Test tabular array with # length marker."""
-        toon = """items[#2]{id,name}:
-  1,Alice
-  2,Bob"""
-        result = decode(toon)
-        assert result == {
-            "items": [
-                {"id": 1, "name": "Alice"},
-                {"id": 2, "name": "Bob"},
-            ]
-        }
+    def test_length_marker_falls_through_in_non_strict_mode(self):
+        result = decode("tags[#3]: a,b,c", DecodeOptions(strict=False))
+        assert result == {"tags[#3]": "a,b,c"}
 
 
 class TestStrictMode:
@@ -192,7 +181,7 @@ class TestStrictMode:
     def test_strict_array_length_mismatch(self):
         """Test that strict mode errors on length mismatch."""
         toon = "items[3]: a,b"  # Declared 3, only 2 values
-        with pytest.raises(ToonDecodeError, match="Expected 3 values"):
+        with pytest.raises(ToonDecodeError, match="expected 3"):
             decode(toon)
 
     def test_non_strict_array_length_mismatch(self):
@@ -206,7 +195,7 @@ class TestStrictMode:
         """Test that strict mode errors on bad indentation."""
         toon = """user:
    id: 1"""  # 3 spaces instead of 2
-        with pytest.raises(ToonDecodeError, match="exact multiple"):
+        with pytest.raises(ToonDecodeError, match="not a multiple"):
             decode(toon)
 
     def test_strict_tabular_row_width_mismatch(self):
@@ -214,7 +203,7 @@ class TestStrictMode:
         toon = """items[2]{a,b,c}:
   1,2,3
   4,5"""  # Second row has only 2 values instead of 3
-        with pytest.raises(ToonDecodeError, match="Expected 3 values"):
+        with pytest.raises(ToonDecodeError, match="expected 3"):
             decode(toon)
 
 
@@ -242,20 +231,20 @@ class TestEdgeCases:
     def test_invalid_escape_sequence(self):
         """Test that invalid escape sequences error."""
         toon = r'text: "invalid\x"'
-        with pytest.raises(ToonDecodeError, match="Invalid escape"):
+        with pytest.raises(ToonDecodeError, match="invalid escape"):
             decode(toon)
 
     def test_unterminated_string(self):
         """Test that unterminated strings error."""
         toon = 'text: "unterminated'
-        with pytest.raises(ToonDecodeError, match="Unterminated"):
+        with pytest.raises(ToonDecodeError, match="unterminated"):
             decode(toon)
 
     def test_missing_colon(self):
         """Test that missing colon errors in strict mode."""
         toon = """key: value
 invalid line without colon"""
-        with pytest.raises(ToonDecodeError, match="Missing colon"):
+        with pytest.raises(ToonDecodeError, match="missing colon"):
             decode(toon)
 
 
@@ -266,8 +255,8 @@ class TestComplexStructures:
         """Test tabular array inside a list item."""
         toon = """items[1]:
   - users[2]{id,name}:
-    1,Alice
-    2,Bob
+      1,Alice
+      2,Bob
     status: active"""
         result = decode(toon)
         assert result == {

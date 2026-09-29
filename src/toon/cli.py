@@ -46,9 +46,9 @@ def main() -> int:
     parser.add_argument(
         "--delimiter",
         type=str,
-        choices=[",", "\t", "|"],
+        choices=[",", "\t", "|", "comma", "tab", "pipe"],
         default=",",
-        help='Array delimiter: , (comma), \\t (tab), | (pipe) (default: ",")',
+        help='Array delimiter: , or comma, \\t or tab, | or pipe (default: ",")',
     )
 
     parser.add_argument(
@@ -56,12 +56,6 @@ def main() -> int:
         type=int,
         default=2,
         help="Indentation size (default: 2)",
-    )
-
-    parser.add_argument(
-        "--length-marker",
-        action="store_true",
-        help="Add # prefix to array lengths (e.g., items[#3])",
     )
 
     parser.add_argument(
@@ -125,7 +119,6 @@ def main() -> int:
                 input_text,
                 delimiter=args.delimiter,
                 indent=args.indent,
-                length_marker=args.length_marker,
             )
         else:
             output_text = decode_toon_to_json(
@@ -155,7 +148,6 @@ def encode_json_to_toon(
     json_text: str,
     delimiter: str = ",",
     indent: int = 2,
-    length_marker: bool = False,
 ) -> str:
     """Encode JSON text to TOON format.
 
@@ -163,7 +155,6 @@ def encode_json_to_toon(
         json_text: JSON input string
         delimiter: Delimiter character
         indent: Indentation size
-        length_marker: Whether to add # prefix
 
     Returns:
         TOON-formatted string
@@ -176,7 +167,6 @@ def encode_json_to_toon(
     options: EncodeOptions = {
         "indent": indent,
         "delimiter": delimiter,
-        "lengthMarker": "#" if length_marker else False,
     }
 
     return encode(data, options)

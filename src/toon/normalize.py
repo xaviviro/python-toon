@@ -1,7 +1,9 @@
 """Value normalization for TOON encoding."""
 
+import dataclasses
 import math
-from datetime import date, datetime
+from collections.abc import Mapping
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any, List
 
@@ -22,19 +24,24 @@ def normalize_value(value: Any) -> JsonValue:
         return value
 
     # Handle numbers
-    if isinstance(value, (int, float)):
-        # Convert -0 to 0
-        if value == 0:
-            return 0
+    if isinstance(value, int):
+        # int() also unwraps subclasses such as IntEnum
+        return int(value)
+    if isinstance(value, float):
         # Convert NaN and Infinity to null
         if math.isnan(value) or math.isinf(value):
             return None
-        return value
+        # Convert -0 to 0
+        if value == 0:
+            return 0
+        return float(value)
 
     # Handle Decimal
     if isinstance(value, Decimal):
         if not value.is_finite():
             return None
+        if value == value.to_integral_value():
+            return int(value)
         return float(value)
 
     # Handle strings
@@ -42,7 +49,7 @@ def normalize_value(value: Any) -> JsonValue:
         return value
 
     # Handle dates
-    if isinstance(value, (date, datetime)):
+    if isinstance(value, (date, datetime, time)):
         return value.isoformat()
 
     # Handle lists/tuples
@@ -50,12 +57,16 @@ def normalize_value(value: Any) -> JsonValue:
         return [normalize_value(item) for item in value]
 
     # Handle sets
-    if isinstance(value, set):
+    if isinstance(value, (set, frozenset)):
         return [normalize_value(item) for item in value]
 
-    # Handle dicts
-    if isinstance(value, dict):
+    # Handle dicts and other mappings
+    if isinstance(value, Mapping):
         return {str(key): normalize_value(val) for key, val in value.items()}
+
+    # Handle dataclass instances
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return normalize_value(dataclasses.asdict(value))
 
     # Handle callables, undefined, symbols -> null
     if callable(value):

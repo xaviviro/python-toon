@@ -9,7 +9,7 @@ from .decoder import ToonDecodeError, decode
 from .encoder import encode
 from .types import DecodeOptions, Delimiter, DelimiterKey, EncodeOptions
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 __all__ = [
     "encode",
     "decode",

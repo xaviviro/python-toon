@@ -1,5 +1,7 @@
 """Tests for TOON encoder."""
 
+import pytest
+
 from toon import encode
 
 
@@ -97,8 +99,8 @@ class TestPrimitiveArrays:
 
     def test_empty_array(self) -> None:
         result = encode([])
-        # Empty arrays show length marker with colon
-        assert result == "[0]:"
+        # Empty root arrays use the literal [] form
+        assert result == "[]"
 
 
 class TestTabularArrays:
@@ -128,14 +130,14 @@ class TestTabularArrays:
         assert "Alice Smith" in result
         assert "New York" in result
 
-    def test_tabular_with_length_marker(self) -> None:
+    def test_length_marker_is_deprecated_and_ignored(self) -> None:
         arr = [
             {"id": 1, "value": "a"},
             {"id": 2, "value": "b"},
         ]
-        result = encode(arr, {"lengthMarker": "#"})
-        # lengthMarker adds # prefix before length
-        assert "[#2,]" in result
+        with pytest.warns(DeprecationWarning):
+            result = encode(arr, {"lengthMarker": "#"})
+        assert result == encode(arr)
 
 
 class TestMixedArrays:
@@ -161,7 +163,7 @@ class TestMixedArrays:
         # Nested arrays use list format with length markers
         assert "[2]:" in result
         assert "- " in result
-        assert "[3,]:" in result  # Inner arrays show length with delimiter
+        assert "- [3]: 1,2,3" in result
 
 
 class TestObjectsWithArrays:
@@ -182,7 +184,7 @@ class TestObjectsWithArrays:
         }
         result = encode(obj)
         # Tabular arrays include length with delimiter
-        assert "users[2,]{id,name}:" in result
+        assert "users[2]{id,name}:" in result
         assert "1,Alice" in result
 
 
@@ -262,7 +264,7 @@ class TestComplexStructures:
         assert "metadata:" in result
         assert "version: 1" in result
         # Tabular arrays include length with delimiter
-        assert "items[2,]{id,name}:" in result
+        assert "items[2]{id,name}:" in result
         # Primitive arrays include length marker
         assert "tags[3]: alpha,beta,gamma" in result
 

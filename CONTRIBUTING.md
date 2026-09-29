@@ -8,8 +8,8 @@ This project uses [`uv`](https://github.com/astral-sh/uv) for dependency managem
 
 ```bash
 # Clone the repository
-git clone https://github.com/toon-format/toon-python.git
-cd toon-python
+git clone https://github.com/xaviviro/python-toon.git
+cd python-toon
 
 # Install dependencies (uv will create a virtual environment automatically)
 uv sync

@@ -1,4 +1,4 @@
-"""Type definitions for pytoon."""
+"""Type definitions for python-toon."""
 
 from typing import Any, Dict, List, Literal, TypedDict, Union
 
@@ -18,8 +18,10 @@ class EncodeOptions(TypedDict, total=False):
 
     Attributes:
         indent: Number of spaces per indentation level (default: 2)
-        delimiter: Delimiter character for arrays (default: comma)
-        lengthMarker: Optional marker to prefix array lengths (default: False)
+        delimiter: Document delimiter: "," | "\t" | "|" or "comma" | "tab" | "pipe"
+            (default: comma)
+        lengthMarker: Deprecated and ignored; the ``#`` length marker was removed from
+            the TOON spec
     """
 
     indent: int
@@ -34,11 +36,9 @@ class ResolvedEncodeOptions:
         self,
         indent: int = 2,
         delimiter: str = ",",
-        length_marker: Literal["#", False] = False,
     ) -> None:
         self.indent = indent
         self.delimiter = delimiter
-        self.lengthMarker = length_marker
 
 
 class DecodeOptions:

@@ -1,17 +1,10 @@
-"""Encoders for different value types."""
+"""Encoders for different value types (spec §8–§10)."""
 
-from typing import List, Optional
+from typing import Any, Iterator, List, Optional
 
-from .constants import LIST_ITEM_PREFIX
-from .normalize import (
-    is_array_of_arrays,
-    is_array_of_objects,
-    is_array_of_primitives,
-    is_json_array,
-    is_json_object,
-    is_json_primitive,
-)
-from .primitives import encode_key, encode_primitive, format_header, join_encoded_values
+from .constants import LIST_ITEM_MARKER, LIST_ITEM_PREFIX
+from .normalize import is_json_array, is_json_object, is_json_primitive
+from .primitives import FieldEntry, encode_key, encode_primitive, format_header
 from .types import Depth, JsonArray, JsonObject, JsonValue, ResolvedEncodeOptions
 from .writer import LineWriter
 
@@ -19,7 +12,7 @@ from .writer import LineWriter
 def encode_value(
     value: JsonValue, options: ResolvedEncodeOptions, writer: LineWriter, depth: Depth = 0
 ) -> None:
-    """Encode a value to TOON format.
+    """Encode a root value to TOON format.
 
     Args:
         value: Normalized JSON value
@@ -30,38 +23,30 @@ def encode_value(
     if is_json_primitive(value):
         writer.push(depth, encode_primitive(value, options.delimiter))
     elif is_json_array(value):
-        encode_array(value, options, writer, depth, None)
+        if not value:
+            writer.push(depth, "[]")
+        else:
+            encode_array(value, options, writer, depth, None, allow_tabular=True)
     elif is_json_object(value):
-        encode_object(value, options, writer, depth, None)
+        keyed_fields = detect_keyed_fields(value)
+        if keyed_fields is not None:
+            encode_keyed_object(value, keyed_fields, options, writer, depth, None)
+        else:
+            encode_object_fields(value, options, writer, depth)
 
 
-def encode_object(
-    obj: JsonObject,
-    options: ResolvedEncodeOptions,
-    writer: LineWriter,
-    depth: Depth,
-    key: Optional[str],
+def encode_object_fields(
+    obj: JsonObject, options: ResolvedEncodeOptions, writer: LineWriter, depth: Depth
 ) -> None:
-    """Encode an object to TOON format.
-
-    Args:
-        obj: Dictionary object
-        options: Resolved encoding options
-        writer: Line writer for output
-        depth: Current indentation depth
-        key: Optional key name
-    """
-    if key:
-        writer.push(depth, f"{encode_key(key)}:")
-
-    for obj_key, obj_value in obj.items():
-        encode_key_value_pair(obj_key, obj_value, options, writer, depth if not key else depth + 1)
+    """Encode each field of an object at the given depth."""
+    for key, value in obj.items():
+        encode_field(key, value, options, writer, depth)
 
 
-def encode_key_value_pair(
+def encode_field(
     key: str, value: JsonValue, options: ResolvedEncodeOptions, writer: LineWriter, depth: Depth
 ) -> None:
-    """Encode a key-value pair.
+    """Encode a single object field (spec §8).
 
     Args:
         key: Key name
@@ -70,12 +55,21 @@ def encode_key_value_pair(
         writer: Line writer for output
         depth: Current indentation depth
     """
+    encoded_key = encode_key(key)
     if is_json_primitive(value):
-        writer.push(depth, f"{encode_key(key)}: {encode_primitive(value, options.delimiter)}")
+        writer.push(depth, f"{encoded_key}: {encode_primitive(value, options.delimiter)}")
     elif is_json_array(value):
-        encode_array(value, options, writer, depth, key)
+        if not value:
+            writer.push(depth, f"{encoded_key}: []")
+        else:
+            encode_array(value, options, writer, depth, key, allow_tabular=True)
     elif is_json_object(value):
-        encode_object(value, options, writer, depth, key)
+        keyed_fields = detect_keyed_fields(value)
+        if keyed_fields is not None:
+            encode_keyed_object(value, keyed_fields, options, writer, depth, key)
+        else:
+            writer.push(depth, f"{encoded_key}:")
+            encode_object_fields(value, options, writer, depth + 1)
 
 
 def encode_array(
@@ -84,212 +78,148 @@ def encode_array(
     writer: LineWriter,
     depth: Depth,
     key: Optional[str],
+    allow_tabular: bool,
 ) -> None:
-    """Encode an array to TOON format.
+    """Encode a non-empty array, choosing the form from its shape (spec §9).
 
     Args:
-        arr: List array
+        arr: Non-empty array
         options: Resolved encoding options
         writer: Line writer for output
-        depth: Current indentation depth
+        depth: Depth of the header line
         key: Optional key name
+        allow_tabular: False for keyless arrays inside list items, where only the
+            inline and list forms are available
     """
-    # Handle empty array
-    if not arr:
-        header = format_header(key, 0, None, options.delimiter, options.lengthMarker)
-        writer.push(depth, header)
+    delimiter = options.delimiter
+
+    if all(is_json_primitive(item) for item in arr):
+        values = delimiter.join(encode_primitive(item, delimiter) for item in arr)
+        writer.push(depth, f"{format_header(key, len(arr), delimiter)} {values}")
         return
 
-    # Check array type and encode accordingly
-    if is_array_of_primitives(arr):
-        encode_inline_primitive_array(arr, options, writer, depth, key)
-    elif is_array_of_arrays(arr):
-        encode_array_of_arrays(arr, options, writer, depth, key)
-    elif is_array_of_objects(arr):
-        tabular_header = detect_tabular_header(arr, options.delimiter)
-        if tabular_header:
-            encode_array_of_objects_as_tabular(arr, tabular_header, options, writer, depth, key)
-        else:
-            encode_mixed_array_as_list_items(arr, options, writer, depth, key)
-    else:
-        encode_mixed_array_as_list_items(arr, options, writer, depth, key)
+    if allow_tabular:
+        fields = detect_fields(arr)
+        if fields is not None:
+            writer.push(depth, format_header(key, len(arr), delimiter, fields))
+            for obj in arr:
+                writer.push(depth + 1, encode_row(obj, fields, options))
+            return
 
-
-def encode_inline_primitive_array(
-    arr: JsonArray,
-    options: ResolvedEncodeOptions,
-    writer: LineWriter,
-    depth: Depth,
-    key: Optional[str],
-) -> None:
-    """Encode an array of primitives inline.
-
-    Args:
-        arr: Array of primitives
-        options: Resolved encoding options
-        writer: Line writer for output
-        depth: Current indentation depth
-        key: Optional key name
-    """
-    encoded_values = [encode_primitive(item, options.delimiter) for item in arr]
-    joined = join_encoded_values(encoded_values, options.delimiter)
-    header = format_header(key, len(arr), None, options.delimiter, options.lengthMarker)
-    writer.push(depth, f"{header} {joined}")
-
-
-def encode_array_of_arrays(
-    arr: JsonArray,
-    options: ResolvedEncodeOptions,
-    writer: LineWriter,
-    depth: Depth,
-    key: Optional[str],
-) -> None:
-    """Encode an array of arrays.
-
-    Args:
-        arr: Array of arrays
-        options: Resolved encoding options
-        writer: Line writer for output
-        depth: Current indentation depth
-        key: Optional key name
-    """
-    header = format_header(key, len(arr), None, options.delimiter, options.lengthMarker)
-    writer.push(depth, header)
-
+    writer.push(depth, format_header(key, len(arr), delimiter))
     for item in arr:
-        if is_array_of_primitives(item):
-            encoded_values = [encode_primitive(v, options.delimiter) for v in item]
-            joined = join_encoded_values(encoded_values, options.delimiter)
-            length_marker = options.lengthMarker if options.lengthMarker else ""
-            writer.push(
-                depth + 1,
-                f"{LIST_ITEM_PREFIX}[{length_marker}{len(item)}{options.delimiter}]: {joined}",
-            )
+        encode_list_item(item, options, writer, depth + 1)
+
+
+def encode_list_item(
+    item: JsonValue, options: ResolvedEncodeOptions, writer: LineWriter, depth: Depth
+) -> None:
+    """Encode one element of an array in list form (spec §9.2, §9.4)."""
+    delimiter = options.delimiter
+    if is_json_primitive(item):
+        writer.push(depth, f"{LIST_ITEM_PREFIX}{encode_primitive(item, delimiter)}")
+    elif is_json_array(item):
+        if not item:
+            writer.push(depth, f"{LIST_ITEM_PREFIX}{format_header(None, 0, delimiter)}")
         else:
-            encode_array(item, options, writer, depth + 1, None)
-
-
-def detect_tabular_header(arr: List[JsonObject], delimiter: str) -> Optional[List[str]]:
-    """Detect if array can use tabular format and return header keys.
-
-    Args:
-        arr: Array of objects
-        delimiter: Delimiter character
-
-    Returns:
-        List of keys if tabular, None otherwise
-    """
-    if not arr:
-        return None
-
-    # Get keys from first object
-    first_keys = list(arr[0].keys())
-
-    # Check all objects have same keys and all values are primitives
-    for obj in arr:
-        if list(obj.keys()) != first_keys:
-            return None
-        if not all(is_json_primitive(value) for value in obj.values()):
-            return None
-
-    return first_keys
-
-
-def is_tabular_array(arr: List[JsonObject], delimiter: str) -> bool:
-    """Check if array qualifies for tabular format.
-
-    Args:
-        arr: Array to check
-        delimiter: Delimiter character
-
-    Returns:
-        True if tabular format can be used
-    """
-    return detect_tabular_header(arr, delimiter) is not None
-
-
-def encode_array_of_objects_as_tabular(
-    arr: List[JsonObject],
-    fields: List[str],
-    options: ResolvedEncodeOptions,
-    writer: LineWriter,
-    depth: Depth,
-    key: Optional[str],
-) -> None:
-    """Encode array of uniform objects in tabular format.
-
-    Args:
-        arr: Array of uniform objects
-        fields: Field names for header
-        options: Resolved encoding options
-        writer: Line writer for output
-        depth: Current indentation depth
-        key: Optional key name
-    """
-    header = format_header(key, len(arr), fields, options.delimiter, options.lengthMarker)
-    writer.push(depth, header)
-
-    for obj in arr:
-        row_values = [encode_primitive(obj[field], options.delimiter) for field in fields]
-        row = join_encoded_values(row_values, options.delimiter)
-        writer.push(depth + 1, row)
-
-
-def encode_mixed_array_as_list_items(
-    arr: JsonArray,
-    options: ResolvedEncodeOptions,
-    writer: LineWriter,
-    depth: Depth,
-    key: Optional[str],
-) -> None:
-    """Encode mixed array as list items.
-
-    Args:
-        arr: Mixed array
-        options: Resolved encoding options
-        writer: Line writer for output
-        depth: Current indentation depth
-        key: Optional key name
-    """
-    header = format_header(key, len(arr), None, options.delimiter, options.lengthMarker)
-    writer.push(depth, header)
-
-    for item in arr:
-        if is_json_primitive(item):
-            writer.push(depth + 1, f"{LIST_ITEM_PREFIX}{encode_primitive(item, options.delimiter)}")
-        elif is_json_object(item):
-            encode_object_as_list_item(item, options, writer, depth + 1)
-        elif is_json_array(item):
-            encode_array(item, options, writer, depth + 1, None)
+            marker = writer.mark()
+            encode_array(item, options, writer, depth, None, allow_tabular=False)
+            writer.hoist_to_list_item(marker, depth)
+            # Nested items were written relative to the header, which now sits on the
+            # hyphen line; they already are at depth + 1 as required.
+    elif is_json_object(item):
+        encode_object_as_list_item(item, options, writer, depth)
 
 
 def encode_object_as_list_item(
     obj: JsonObject, options: ResolvedEncodeOptions, writer: LineWriter, depth: Depth
 ) -> None:
-    """Encode object as a list item.
+    """Encode an object as a list item (spec §10).
 
-    Args:
-        obj: Object to encode
-        options: Resolved encoding options
-        writer: Line writer for output
-        depth: Current indentation depth
+    The first field is carried on the hyphen line; it is encoded as if it stood at
+    depth + 1, so its own content lands at depth + 2 and the remaining fields at
+    depth + 1.
     """
-    # Get all keys
-    keys = list(obj.items())
-    if not keys:
-        writer.push(depth, LIST_ITEM_PREFIX.rstrip())
+    if not obj:
+        writer.push(depth, LIST_ITEM_MARKER)
         return
 
-    # First key-value pair goes on same line as the "-"
-    first_key, first_value = keys[0]
-    if is_json_primitive(first_value):
-        encoded_val = encode_primitive(first_value, options.delimiter)
-        writer.push(depth, f"{LIST_ITEM_PREFIX}{encode_key(first_key)}: {encoded_val}")
-    else:
-        # If first value is not primitive, put "-" alone then encode normally
-        writer.push(depth, LIST_ITEM_PREFIX.rstrip())
-        encode_key_value_pair(first_key, first_value, options, writer, depth + 1)
+    items = iter(obj.items())
+    first_key, first_value = next(items)
+    marker = writer.mark()
+    encode_field(first_key, first_value, options, writer, depth + 1)
+    writer.hoist_to_list_item(marker, depth)
 
-    # Rest of the keys go normally indented
-    for key, value in keys[1:]:
-        encode_key_value_pair(key, value, options, writer, depth + 1)
+    for key, value in items:
+        encode_field(key, value, options, writer, depth + 1)
+
+
+def encode_keyed_object(
+    obj: JsonObject,
+    fields: List[FieldEntry],
+    options: ResolvedEncodeOptions,
+    writer: LineWriter,
+    depth: Depth,
+    key: Optional[str],
+) -> None:
+    """Encode an object of uniform objects in keyed tabular form (spec §9.5)."""
+    writer.push(depth, format_header(key, len(obj), options.delimiter, fields, keyed=True))
+    for entry_key, entry_value in obj.items():
+        row = encode_row(entry_value, fields, options)
+        writer.push(depth + 1, f"{encode_key(entry_key)}: {row}")
+
+
+def encode_row(obj: JsonObject, fields: List[FieldEntry], options: ResolvedEncodeOptions) -> str:
+    """Encode an object's leaf values as a delimiter-joined row."""
+    delimiter = options.delimiter
+    return delimiter.join(encode_primitive(value, delimiter) for value in iter_leaves(obj, fields))
+
+
+def iter_leaves(obj: JsonObject, fields: List[FieldEntry]) -> Iterator[Any]:
+    """Yield leaf values in depth-first, pre-order field-list order."""
+    for name, sub_fields in fields:
+        if sub_fields is None:
+            yield obj[name]
+        else:
+            yield from iter_leaves(obj[name], sub_fields)
+
+
+def detect_fields(values: List[Any]) -> Optional[List[FieldEntry]]:
+    """Return the field list if ``values`` qualifies for a tabular form (spec §9.3).
+
+    Every value must be a non-empty object, all with the same key set, and every
+    column must be uniform-primitive or nested-uniform (recursively).
+
+    Args:
+        values: Array elements, or entry values of a keyed tabular candidate
+
+    Returns:
+        The field list in the first object's encounter order, or None
+    """
+    first = values[0] if values else None
+    if not isinstance(first, dict) or not first:
+        return None
+
+    key_set = set(first)
+    for value in values:
+        if not isinstance(value, dict) or len(value) != len(key_set) or set(value) != key_set:
+            return None
+
+    fields: List[FieldEntry] = []
+    for name in first:
+        column = [value[name] for value in values]
+        if all(is_json_primitive(cell) for cell in column):
+            fields.append((name, None))
+        else:
+            sub_fields = detect_fields(column)
+            if sub_fields is None:
+                return None
+            fields.append((name, sub_fields))
+    return fields
+
+
+def detect_keyed_fields(obj: JsonObject) -> Optional[List[FieldEntry]]:
+    """Return the field list if ``obj`` qualifies for keyed tabular form (spec §9.5)."""
+    if len(obj) < 2:
+        return None
+    return detect_fields(list(obj.values()))
