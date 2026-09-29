@@ -7,7 +7,7 @@
 A compact data format optimized for transmitting structured information to Large Language Models (LLMs) with 30-60% fewer tokens than JSON.
 
 [![Tests](https://github.com/xaviviro/python-toon/actions/workflows/test.yml/badge.svg)](https://github.com/xaviviro/python-toon/actions)
-[![PyPI](https://img.shields.io/pypi/v/python-toon.svg)](https://pypi.org/project/python-toon/)
+[![PyPI](https://img.shields.io/pypi/v/python-toon.svg?cacheSeconds=3600)](https://pypi.org/project/python-toon/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/python-toon.svg)](https://pypi.org/project/python-toon/)
 
 [![Downloads](https://static.pepy.tech/badge/python-toon)](https://pepy.tech/project/python-toon)
